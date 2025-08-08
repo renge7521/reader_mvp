@@ -1,0 +1,49 @@
+name: Android APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+
+      - name: Show Flutter version
+        run: flutter --version
+
+      # ZIP（reader_mvp_ci.zip）を展開してプロジェクトを用意
+      - name: Unzip project
+        run: |
+          unzip -o reader_mvp_ci.zip -d .
+          # 念のため flutter create（Android雛形が無い場合に作成）
+          flutter create . --platforms=android --overwrite
+          # 用意済みのマニフェストを適用
+          cp -f ci_android/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
+
+      # Tesseractの日本語モデルをプロジェクト内に配置（オフライン用）
+      - name: Prepare tessdata (jpn, jpn_vert)
+        run: |
+          mkdir -p assets/tessdata
+          curl -L -o assets/tessdata/jpn.traineddata https://github.com/tesseract-ocr/tessdata_fast/raw/main/jpn.traineddata
+          curl -L -o assets/tessdata/jpn_vert.traineddata https://github.com/tesseract-ocr/tessdata_fast/raw/main/jpn_vert.traineddata
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Build APK (release)
+        run: flutter build apk --release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: reader_mvp-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
