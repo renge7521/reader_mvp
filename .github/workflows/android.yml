@@ -49,6 +49,7 @@ jobs:
       flutter create . --platforms=android
     fi
 
+
         
 
       - name: Prepare tessdata (jpn, jpn_vert)
