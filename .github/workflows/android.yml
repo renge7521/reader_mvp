@@ -43,7 +43,7 @@ jobs:
           # Android雛形が無ければ生成（あっても上書きOK）
           flutter create . --platforms=android --overwrite
           # 置いてあればマニフェストを適用（無ければ無視）
-          [ -f ci_android/AndroidManifest.xml ] && cp -f ci_android/AndroidManifest.xml android/app/src/main/AndroidManifest.xml || true
+        
 
       - name: Prepare tessdata (jpn, jpn_vert)
         run: |
