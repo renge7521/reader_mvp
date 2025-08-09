@@ -20,14 +20,31 @@ jobs:
       - name: Show Flutter version
         run: flutter --version
 
-      # ZIP（reader_mvp_ci.zip）を展開してプロジェクトを用意
+      # ← ここを強化：ZIPの実在場所を自動で見つける
+      - name: Locate ZIP
+        id: locate
+        run: |
+          set -e
+          if [ -f reader_mvp_ci.zip ]; then
+            echo "zip=reader_mvp_ci.zip" >> $GITHUB_OUTPUT
+            echo "Found ZIP at repo root"
+          elif [ -f reader_mvp/reader_mvp_ci.zip ]; then
+            echo "zip=reader_mvp/reader_mvp_ci.zip" >> $GITHUB_OUTPUT
+            echo "Found ZIP under reader_mvp/"
+          else
+            echo "ZIP not found. Listing files:"
+            ls -la
+            exit 1
+          fi
+
       - name: Unzip project
         run: |
-          unzip -o reader_mvp_ci.zip -d .
+          unzip -o "${{ steps.locate.outputs.zip }}" -d .
+          # Android雛形が無ければ生成（あっても上書きOK）
           flutter create . --platforms=android --overwrite
-          cp -f ci_android/AndroidManifest.xml android/app/src/main/AndroidManifest.xml || true
+          # 置いてあればマニフェストを適用（無ければ無視）
+          [ -f ci_android/AndroidManifest.xml ] && cp -f ci_android/AndroidManifest.xml android/app/src/main/AndroidManifest.xml || true
 
-      # Tesseractの日本語モデルをプロジェクト内に配置（オフライン用）
       - name: Prepare tessdata (jpn, jpn_vert)
         run: |
           mkdir -p assets/tessdata
