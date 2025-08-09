@@ -24,10 +24,8 @@ jobs:
       - name: Unzip project
         run: |
           unzip -o reader_mvp_ci.zip -d .
-          # 念のため flutter create（Android雛形が無い場合に作成）
           flutter create . --platforms=android --overwrite
-          # 用意済みのマニフェストを適用
-          cp -f ci_android/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
+          cp -f ci_android/AndroidManifest.xml android/app/src/main/AndroidManifest.xml || true
 
       # Tesseractの日本語モデルをプロジェクト内に配置（オフライン用）
       - name: Prepare tessdata (jpn, jpn_vert)
