@@ -16,6 +16,7 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: "stable"
+
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
@@ -25,7 +26,7 @@ jobs:
       - name: Flutter doctor
         run: flutter doctor -v
 
-      # ZIPの場所を自動検出（root直下 or reader_mvp/ 配下）
+      # ZIPの場所を自動検出（repo直下 or reader_mvp/配下）
       - name: Locate ZIP
         id: locate
         run: |
@@ -42,7 +43,7 @@ jobs:
             exit 1
           fi
 
-      # ZIPを展開。既に android/ がある場合は flutter create で上書きしない
+      # ZIPを展開。既に android/ があるなら flutter create で上書きしない
       - name: Unzip project
         run: |
           unzip -o "${{ steps.locate.outputs.zip }}" -d .
@@ -54,7 +55,7 @@ jobs:
             flutter create . --platforms=android
           fi
 
-      # Android SDKレベルを調整（最新プラグイン/Android 15向け）
+      # Android SDKレベルを調整（最新プラグイン/Android 15 対応）
       - name: Set Android SDK levels (min/target/compile)
         run: |
           sed -i 's/minSdkVersion [0-9][0-9]*/minSdkVersion 23/' android/app/build.gradle || true
@@ -70,12 +71,25 @@ jobs:
           echo "---- assets/tessdata ----"
           ls -la assets/tessdata
 
+      # 依存取得（詳細ログをファイル保存）
       - name: Flutter pub get
-        run: flutter pub get
+        run: flutter pub get -v | tee pubget.log
 
-      # 詳細ログ（-v）でAPKビルド
+      # ワークスペースのスナップショット（任意だが調査に便利）
+      - name: Snapshot workspace tree
+        run: |
+          ls -la > workspace-tree.txt
+          ls -R >> workspace-tree.txt
+
+      # APKビルド（詳細/スタックトレース/ログ保存）
       - name: Build APK (release)
-        run: flutter build apk --release -v
+        env:
+          GRADLE_OPTS: "-Dorg.gradle.logging.stacktrace=all -Dorg.gradle.console=plain"
+        run: |
+          set -e
+          flutter build apk --release -v --verbose | tee build.log
+          echo "---- APK outputs ----"
+          ls -R build/app/outputs || true | tee -a build.log
 
       # 成功/失敗に関わらず成果物とログをアップロード
       - name: Upload APK/outputs
@@ -85,6 +99,7 @@ jobs:
           name: reader_mvp-release-apk
           path: |
             build/app/outputs/**/*
+            workspace-tree.txt
 
       - name: Upload logs (always)
         if: always()
@@ -92,6 +107,8 @@ jobs:
         with:
           name: build-logs
           path: |
+            build.log
+            pubget.log
             ./**/flutter*.log
             **/*.log
             **/*.stacktrace
