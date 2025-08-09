@@ -17,10 +17,10 @@ jobs:
         with:
           channel: "stable"
 
-      - name: Show Flutter version
-        run: flutter --version
+      - name: Flutter doctor
+        run: flutter doctor -v
 
-      # ← ここを強化：ZIPの実在場所を自動で見つける
+      # ZIPの場所を自動検出（root直下 or reader_mvp/ 配下）
       - name: Locate ZIP
         id: locate
         run: |
@@ -37,35 +37,57 @@ jobs:
             exit 1
           fi
 
+      # ZIPを展開。既に android/ がある場合は flutter create で上書きしない
       - name: Unzip project
-  run: |
-    unzip -o "${{ steps.locate.outputs.zip }}" -d .
-    echo "---- repo tree after unzip ----"
-    ls -la
-    echo "---- lib dir ----"
-    ls -la lib || true
-    # Android 雛形が無ければ作成（lib等は上書きしない）
-    if [ ! -d android ]; then
-      flutter create . --platforms=android
-    fi
+        run: |
+          unzip -o "${{ steps.locate.outputs.zip }}" -d .
+          echo "---- repo tree after unzip ----"
+          ls -la
+          echo "---- lib dir ----"
+          ls -la lib || true
+          if [ ! -d android ]; then
+            flutter create . --platforms=android
+          fi
 
+      # Android SDKレベルを調整（最新プラグイン/Android 15向け）
+      - name: Set Android SDK levels (min/target/compile)
+        run: |
+          sed -i 's/minSdkVersion [0-9][0-9]*/minSdkVersion 23/' android/app/build.gradle || true
+          sed -i 's/targetSdkVersion [0-9][0-9]*/targetSdkVersion 34/' android/app/build.gradle || true
+          sed -i 's/compileSdkVersion [0-9][0-9]*/compileSdkVersion 34/' android/app/build.gradle || true
 
-        
-
+      # Tesseract 日本語データを同梱（オフライン動作用）
       - name: Prepare tessdata (jpn, jpn_vert)
         run: |
           mkdir -p assets/tessdata
           curl -L -o assets/tessdata/jpn.traineddata https://github.com/tesseract-ocr/tessdata_fast/raw/main/jpn.traineddata
           curl -L -o assets/tessdata/jpn_vert.traineddata https://github.com/tesseract-ocr/tessdata_fast/raw/main/jpn_vert.traineddata
+          echo "---- assets/tessdata ----"
+          ls -la assets/tessdata
 
       - name: Flutter pub get
         run: flutter pub get
 
+      # 詳細ログ（-v）でAPKビルド
       - name: Build APK (release)
-        run: flutter build apk --release
+        run: flutter build apk --release -v
 
-      - name: Upload artifact
+      # 成功/失敗に関わらず成果物とログをアップロード
+      - name: Upload APK/outputs
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: reader_mvp-release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: |
+            build/app/outputs/**/*
+
+      - name: Upload logs (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            ./**/flutter*.log
+            **/*.log
+            **/*.stacktrace
+            android/**/outputs/logs/*
