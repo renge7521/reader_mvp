@@ -38,11 +38,17 @@ jobs:
           fi
 
       - name: Unzip project
-        run: |
-          unzip -o "${{ steps.locate.outputs.zip }}" -d .
-          # Android雛形が無ければ生成（あっても上書きOK）
-          flutter create . --platforms=android --overwrite
-          # 置いてあればマニフェストを適用（無ければ無視）
+  run: |
+    unzip -o "${{ steps.locate.outputs.zip }}" -d .
+    echo "---- repo tree after unzip ----"
+    ls -la
+    echo "---- lib dir ----"
+    ls -la lib || true
+    # Android 雛形が無ければ作成（lib等は上書きしない）
+    if [ ! -d android ]; then
+      flutter create . --platforms=android
+    fi
+
         
 
       - name: Prepare tessdata (jpn, jpn_vert)
