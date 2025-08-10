@@ -1,13 +1,13 @@
 name: Android APK
 
 on:
-  push:
-    branches: [ main ]
+  # 手動だけで実行（自動では走らない）
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -15,91 +15,67 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: "stable"
+          channel: stable
 
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '17'
+          distribution: temurin
+          java-version: "17"
 
       - name: Flutter doctor
         run: flutter doctor -v
 
-      # ZIPの場所を自動検出（repo直下 or reader_mvp/配下）
+      # ZIPの場所を自動検出（repo直下 or reader_mvp/ 配下など）
       - name: Locate ZIP
         id: locate
         run: |
           set -e
-          if [ -f reader_mvp_ci.zip ]; then
-            echo "zip=reader_mvp_ci.zip" >> $GITHUB_OUTPUT
-            echo "Found ZIP at repo root"
-          elif [ -f reader_mvp/reader_mvp_ci.zip ]; then
-            echo "zip=reader_mvp/reader_mvp_ci.zip" >> $GITHUB_OUTPUT
-            echo "Found ZIP under reader_mvp/"
-          else
-            echo "ZIP not found. Listing files:"
-            ls -la
-            exit 1
-          fi
+          for p in "reader_mvp_ci.zip" "reader_mvp/reader_mvp_ci.zip"; do
+            if [ -f "$p" ]; then
+              echo "zip=$p" >> $GITHUB_OUTPUT
+              echo "Found: $p"
+              exit 0
+            fi
+          done
+          echo "ZIP not found"; ls -la
+          exit 1
 
-      # ZIPを展開。既に android/ があるなら flutter create で上書きしない
       - name: Unzip project
         run: |
           unzip -o "${{ steps.locate.outputs.zip }}" -d .
-          echo "---- repo tree after unzip ----"
+          # 必要ならFlutterのandroid骨格を生成（既にあれば何もしない）
+          if [ ! -d android ]; then flutter create . --platforms=android; fi
           ls -la
-          echo "---- lib dir ----"
-          ls -la lib || true
-          if [ ! -d android ]; then
-            flutter create . --platforms=android
-          fi
+          ls -R android/app/src || true
+          ls -R lib || true
 
-      # Android SDKレベルを調整（最新プラグイン/Android 15 対応）
-      - name: Set Android SDK levels (min/target/compile)
-        run: |
-          sed -i 's/minSdkVersion [0-9][0-9]*/minSdkVersion 23/' android/app/build.gradle || true
-          sed -i 's/targetSdkVersion [0-9][0-9]*/targetSdkVersion 34/' android/app/build.gradle || true
-          sed -i 's/compileSdkVersion [0-9][0-9]*/compileSdkVersion 34/' android/app/build.gradle || true
-
-      # Tesseract 日本語データを同梱（オフライン動作用）
-      - name: Prepare tessdata (jpn, jpn_vert)
+      # tessdata（日本語・縦書き）を同梱
+      - name: Prepare tessdata
         run: |
           mkdir -p assets/tessdata
           curl -L -o assets/tessdata/jpn.traineddata https://github.com/tesseract-ocr/tessdata_fast/raw/main/jpn.traineddata
           curl -L -o assets/tessdata/jpn_vert.traineddata https://github.com/tesseract-ocr/tessdata_fast/raw/main/jpn_vert.traineddata
-          echo "---- assets/tessdata ----"
           ls -la assets/tessdata
 
-      # 依存取得（詳細ログをファイル保存）
-      - name: Flutter pub get
+      - name: Flutter pub get (logged)
         run: flutter pub get -v | tee pubget.log
 
-      # ワークスペースのスナップショット（任意だが調査に便利）
-      - name: Snapshot workspace tree
-        run: |
-          ls -la > workspace-tree.txt
-          ls -R >> workspace-tree.txt
-
-      # APKビルド（詳細/スタックトレース/ログ保存）
-      - name: Build APK (release)
+      - name: Build APK (release, verbose)
         env:
           GRADLE_OPTS: "-Dorg.gradle.logging.stacktrace=all -Dorg.gradle.console=plain"
         run: |
           set -e
-          flutter build apk --release -v --verbose | tee build.log
-          echo "---- APK outputs ----"
-          ls -R build/app/outputs || true | tee -a build.log
+          flutter build apk --release -v | tee build.log
+          echo "---- outputs ----" | tee -a build.log
+          ls -R build/app/outputs | tee -a build.log
 
-      # 成功/失敗に関わらず成果物とログをアップロード
-      - name: Upload APK/outputs
+      - name: Upload APK
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: reader_mvp-release-apk
-          path: |
-            build/app/outputs/**/*
-            workspace-tree.txt
+          path: build/app/outputs/**/*
 
       - name: Upload logs (always)
         if: always()
@@ -109,7 +85,6 @@ jobs:
           path: |
             build.log
             pubget.log
-            ./**/flutter*.log
             **/*.log
             **/*.stacktrace
             android/**/outputs/logs/*
