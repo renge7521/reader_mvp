@@ -1,7 +1,6 @@
 name: Android APK
 
 on:
-  # 手動だけで実行（自動では走らない）
   workflow_dispatch:
 
 jobs:
@@ -26,7 +25,6 @@ jobs:
       - name: Flutter doctor
         run: flutter doctor -v
 
-      # ZIPの場所を自動検出（repo直下 or reader_mvp/ 配下など）
       - name: Locate ZIP
         id: locate
         run: |
@@ -44,13 +42,11 @@ jobs:
       - name: Unzip project
         run: |
           unzip -o "${{ steps.locate.outputs.zip }}" -d .
-          # 必要ならFlutterのandroid骨格を生成（既にあれば何もしない）
           if [ ! -d android ]; then flutter create . --platforms=android; fi
-          ls -la
+          ls -R android/app/outputs || true
           ls -R android/app/src || true
           ls -R lib || true
 
-      # tessdata（日本語・縦書き）を同梱
       - name: Prepare tessdata
         run: |
           mkdir -p assets/tessdata
@@ -70,13 +66,14 @@ jobs:
           echo "---- outputs ----" | tee -a build.log
           ls -R build/app/outputs | tee -a build.log
 
+      # ★ ここを修正：実際のAPKのパスを指定
       - name: Upload APK
-        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: reader_mvp-release-apk
-          path: build/app/outputs/**/*
+          name: app-release.apk
+          path: build/app/outputs/flutter-apk/app-release.apk
 
+      # ついでにログも残す
       - name: Upload logs (always)
         if: always()
         uses: actions/upload-artifact@v4
