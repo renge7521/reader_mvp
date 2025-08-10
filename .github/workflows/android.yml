@@ -1,4 +1,4 @@
-name: Android APK
+name: Android APK (clean build)
 
 on:
   workflow_dispatch:
@@ -25,55 +25,74 @@ jobs:
       - name: Flutter doctor
         run: flutter doctor -v
 
-      - name: Locate ZIP
-        id: locate
+      # ★ ここがポイント：毎回クリーンなAndroidを作り直す（V2埋め込みで生成）
+      - name: Recreate Android folder (V2 embedding)
         run: |
-          set -e
-          for p in "reader_mvp_ci.zip" "reader_mvp/reader_mvp_ci.zip"; do
-            if [ -f "$p" ]; then
-              echo "zip=$p" >> $GITHUB_OUTPUT
-              echo "Found: $p"
-              exit 0
-            fi
-          done
-          echo "ZIP not found"; ls -la
-          exit 1
+          rm -rf android
+          flutter create . --platforms=android --org com.example --project-name reader_mvp --overwrite
+          # 必須権限＆Activity定義（上書き）
+          cat > android/app/src/main/AndroidManifest.xml <<'MANI'
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.CAMERA"/>
+              <application
+                  android:name="${applicationName}"
+                  android:label="reader_mvp"
+                  android:icon="@mipmap/ic_launcher">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:launchMode="singleTop"
+                      android:theme="@style/LaunchTheme"
+                      android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+                      android:hardwareAccelerated="true"
+                      android:windowSoftInputMode="adjustResize">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN"/>
+                          <category android:name="android.intent.category.LAUNCHER"/>
+                      </intent-filter>
+                  </activity>
+                  <meta-data android:name="io.flutter.embedding.android.NormalTheme" android:resource="@style/NormalTheme"/>
+                  <meta-data android:name="flutterEmbedding" android:value="2"/>
+              </application>
+          </manifest>
+          MANI
+          # debug/profile は最小構成
+          mkdir -p android/app/src/debug android/app/src/profile
+          printf '<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application android:name="${applicationName}" /></manifest>' > android/app/src/debug/AndroidManifest.xml
+          cp android/app/src/debug/AndroidManifest.xml android/app/src/profile/AndroidManifest.xml
 
-      - name: Unzip project
+      - name: Ensure MainActivity is V2 (Kotlin)
         run: |
-          unzip -o "${{ steps.locate.outputs.zip }}" -d .
-          if [ ! -d android ]; then flutter create . --platforms=android; fi
-          ls -R android/app/outputs || true
-          ls -R android/app/src || true
-          ls -R lib || true
+          mkdir -p android/app/src/main/kotlin/com/example/reader_mvp
+          cat > android/app/src/main/kotlin/com/example/reader_mvp/MainActivity.kt <<'KOT'
+          package com.example.reader_mvp
+          import io.flutter.embedding.android.FlutterActivity
+          class MainActivity: FlutterActivity()
+          KOT
 
-      - name: Prepare tessdata
+      - name: Prepare tessdata (jpn + jpn_vert)
         run: |
           mkdir -p assets/tessdata
           curl -L -o assets/tessdata/jpn.traineddata https://github.com/tesseract-ocr/tessdata_fast/raw/main/jpn.traineddata
           curl -L -o assets/tessdata/jpn_vert.traineddata https://github.com/tesseract-ocr/tessdata_fast/raw/main/jpn_vert.traineddata
           ls -la assets/tessdata
 
-      - name: Flutter pub get (logged)
+      - name: flutter pub get
         run: flutter pub get -v | tee pubget.log
 
-      - name: Build APK (release, verbose)
+      - name: Build APK (release)
         env:
           GRADLE_OPTS: "-Dorg.gradle.logging.stacktrace=all -Dorg.gradle.console=plain"
         run: |
-          set -e
           flutter build apk --release -v | tee build.log
-          echo "---- outputs ----" | tee -a build.log
           ls -R build/app/outputs | tee -a build.log
 
-      # ★ ここを修正：実際のAPKのパスを指定
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: app-release.apk
           path: build/app/outputs/flutter-apk/app-release.apk
 
-      # ついでにログも残す
       - name: Upload logs (always)
         if: always()
         uses: actions/upload-artifact@v4
