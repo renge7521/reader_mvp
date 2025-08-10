@@ -1,4 +1,4 @@
-name: Build Android APK (V2 embedding)
+name: Android APK (auto-fix & debug)
 
 on:
   workflow_dispatch:
@@ -8,22 +8,74 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout source
-        uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Setup Flutter
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Flutter (stable)
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.19.6'
+          channel: stable
 
-      - name: Install dependencies
-        run: flutter pub get
+      # 0) ルートに pubspec.yaml が無い場合は最小構成を自動生成（あるなら触らない）
+      - name: Ensure Flutter project root
+        run: |
+          if [ ! -f pubspec.yaml ]; then
+            echo "pubspec.yaml not found. Creating minimal Flutter project files..."
+            flutter create . --platforms=android --org com.example --project-name reader_mvp --overwrite
+          fi
 
+      # 1) Android を常に V2 で再生成（古いV1を物理的に排除）
+      - name: Recreate Android folder (V2)
+        run: |
+          rm -rf android
+          flutter create . --platforms=android --org com.example --project-name reader_mvp --overwrite
+
+      # 2) MainActivity をV2で明示上書き（Kotlin）
+      - name: Ensure MainActivity V2
+        run: |
+          mkdir -p android/app/src/main/kotlin/com/example/reader_mvp
+          cat > android/app/src/main/kotlin/com/example/reader_mvp/MainActivity.kt <<'KOT'
+          package com.example.reader_mvp
+          import io.flutter.embedding.android.FlutterActivity
+          class MainActivity : FlutterActivity()
+          KOT
+
+      # 3) Tesseractの学習データ（assets/tessdata）を用意（既にあればスキップ）
+      - name: Prepare tessdata (jpn & jpn_vert)
+        run: |
+          mkdir -p assets/tessdata
+          [ -f assets/tessdata/jpn.traineddata ] || curl -L -o assets/tessdata/jpn.traineddata https://github.com/tesseract-ocr/tessdata_fast/raw/main/jpn.traineddata
+          [ -f assets/tessdata/jpn_vert.traineddata ] || curl -L -o assets/tessdata/jpn_vert.traineddata https://github.com/tesseract-ocr/tessdata_fast/raw/main/jpn_vert.traineddata
+
+      # 4) 依存取得
+      - name: flutter pub get
+        run: flutter pub get -v | tee pubget.log
+
+      # 5) Debugビルド（端末へそのまま入る）
       - name: Build APK (debug)
-        run: flutter build apk --debug
+        run: flutter build apk --debug -v | tee build.log
 
+      # 6) 生成物を取得
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: app-debug.apk
           path: build/app/outputs/flutter-apk/app-debug.apk
+
+      - name: Upload logs (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            build.log
+            pubget.log
+            **/*.log
+            **/*.stacktrace
+            android/**/outputs/logs/*
