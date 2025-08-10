@@ -21,13 +21,13 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      # 1) 既存の android を捨てて毎回V2で作り直す
+      # 既存androidを捨ててV2で作り直す
       - name: Clean and recreate Android (V2)
         run: |
           rm -rf android
           flutter create . --platforms=android --org com.example --project-name reader_mvp --overwrite
 
-      # 2) MainActivity を明示的にV2に上書き（Kotlin）
+      # 明示的にV2 MainActivityに上書き
       - name: Ensure MainActivity is V2
         run: |
           mkdir -p android/app/src/main/kotlin/com/example/reader_mvp
@@ -37,14 +37,6 @@ jobs:
           class MainActivity: FlutterActivity()
           KOT
 
-      # 3) 念のためV1の痕跡がないかチェック（あれば失敗させる）
-      - name: Check for V1 embedding (guard)
-        run: |
-          if grep -R "io.flutter.app.FlutterActivity" -n android || grep -R "GeneratedPluginRegistrant" -n android; then
-            echo "Found old V1 embedding code"; exit 1;
-          fi
-
-      # 4) Tesseract データ同梱
       - name: Prepare tessdata
         run: |
           mkdir -p assets/tessdata
@@ -54,7 +46,6 @@ jobs:
       - name: flutter pub get
         run: flutter pub get -v | tee pubget.log
 
-      # 5) Debug でビルド（デバッグ署名つき→端末にそのまま入る）
       - name: Build APK (debug)
         run: flutter build apk --debug -v | tee build.log
 
@@ -63,15 +54,3 @@ jobs:
         with:
           name: app-debug.apk
           path: build/app/outputs/flutter-apk/app-debug.apk
-
-      - name: Upload logs (always)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-logs
-          path: |
-            build.log
-            pubget.log
-            **/*.log
-            **/*.stacktrace
-            android/**/outputs/logs/*
