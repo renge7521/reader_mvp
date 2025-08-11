@@ -60,7 +60,6 @@ jobs:
       # 5) Debugビルド（端末へそのまま入る）
       - name: Build APK (split per ABI)
         run: |
-          # ARM(32/64) と x86_64 を別々のAPKで作成
           flutter build apk --debug \
             --target-platform android-arm,android-arm64,android-x64 \
             --split-per-abi
@@ -73,6 +72,14 @@ jobs:
             build/app/outputs/flutter-apk/app-armeabi-v7a-debug.apk
             build/app/outputs/flutter-apk/app-arm64-v8a-debug.apk
             build/app/outputs/flutter-apk/app-x86_64-debug.apk
+
+  
+
+      
+          
+  
+          
+        
   
           
           
