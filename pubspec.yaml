@@ -19,7 +19,7 @@ dependencies:
   google_mlkit_text_recognition: ^0.11.0
 
   # 読み上げ
-  flutter_tts: ^3.8.3
+　flutter_tts: ^3.8.5   # ← ここを最新にする
 
   # 権限ダイアログ
   permission_handler: ^11.3.1
