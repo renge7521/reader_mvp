@@ -1,7 +1,6 @@
 name: reader_mvp
 description: MVP reader app (camera + OCR + TTS)
 publish_to: "none"
-
 version: 1.0.0+1
 
 environment:
@@ -13,11 +12,11 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.6
 
-  # カメラ機能
+  # カメラ撮影
   camera: ^0.10.5+9
 
-  # 端末内OCR (ML Kit Text Recognition)
-  google_mlkit_text_recognition: ^0.10.0
+  # 端末内OCR（Google ML Kit）
+  google_mlkit_text_recognition: ^0.11.0
 
   # 読み上げ
   flutter_tts: ^3.8.3
@@ -25,10 +24,7 @@ dependencies:
   # 権限ダイアログ
   permission_handler: ^11.3.1
 
-  # 一時保存など
-  path_provider: ^2.1.4
-
-  # 画像処理（必要な場合）
+  # 画像前処理が必要なら（今は未使用だが残してOK）
   image: ^4.2.0
 
 dev_dependencies:
@@ -38,6 +34,3 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  # もし assets を使う場合は以下を有効化
-  # assets:
-  #   - assets/
