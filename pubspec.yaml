@@ -1,3 +1,8 @@
+name: reader_mvp
+description: MVP reader app
+publish_to: "none"
+version: 1.0.0+1
+
 environment:
   sdk: ">=3.3.0 <4.0.0"
   flutter: ">=3.19.0"
@@ -6,20 +11,10 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.6
-
-  # カメラ撮影
   camera: ^0.10.5+9
-
-  # 端末内OCR (Google ML Kit)
   google_mlkit_text_recognition: ^0.11.0
-
-  # 読み上げ
   flutter_tts: ^3.8.5
-
-  # 権限ダイアログ
   permission_handler: ^11.3.1
-
-  # 画像前処理（必要なら）
   image: ^4.2.0
 
 dev_dependencies:
