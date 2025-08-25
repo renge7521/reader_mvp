@@ -4,11 +4,12 @@ plugins {
 }
 
 android {
-    namespace = "com.example.reader_mvp"   // ← これが 2) と一致
+    namespace = "com.renger.reader_mvp"
+
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.example.reader_mvp"
+        applicationId = "com.renger.reader_mvp"
         minSdk = 21
         targetSdk = 34
         versionCode = 1
@@ -28,11 +29,4 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
-
-    // Kotlin ソースを含める（テンプレだと自動ですが念のため）
-    sourceSets["main"].java.srcDirs("src/main/kotlin")
-}
-
-dependencies {
-    implementation("org.jetbrains.kotlin:kotlin-stdlib:1.9.24")
 }
